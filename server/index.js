@@ -18,7 +18,10 @@ import SymptomCheck from './models/SymptomCheck.js';
 import { chatbotAgent, symptomCheckerAgent, medicationReminderAgent, medicalHistoryAnalyzerAgent } from './agents/index.js';
 import { sendOtpEmail, sendMedicationReminderEmail } from './utils/email.js';
 import voiceRouter from './routes/voice.js';
-
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
@@ -697,6 +700,13 @@ app.post('/api/medication-reminder', requireAuth, async (req, res) => {
     console.error('Medication reminder agent error:', err);
     res.status(500).json({ error: 'Medication reminder agent error' });
   }
+});
+// Serve React build
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// React Router support
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
 app.listen(PORT, () => {
