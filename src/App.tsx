@@ -62,6 +62,8 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => {
+  const { user } = useAuthContext();
+  
   return (
     <Routes>
       <Route path="/" element={<Index />} />
@@ -85,7 +87,7 @@ const AppRoutes = () => {
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            {user?.role === 'doctor' ? <Navigate to="/doctor-dashboard" replace /> : <Dashboard />}
           </ProtectedRoute>
         }
       />
@@ -93,7 +95,7 @@ const AppRoutes = () => {
         path="/doctor-dashboard"
         element={
           <ProtectedRoute>
-            <DoctorDashboard />
+            {user?.role === 'patient' ? <Navigate to="/dashboard" replace /> : <DoctorDashboard />}
           </ProtectedRoute>
         }
       />

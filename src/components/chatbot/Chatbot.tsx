@@ -76,6 +76,7 @@ export const Chatbot = () => {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [lastMessageWasVoiceInput, setLastMessageWasVoiceInput] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -165,6 +166,7 @@ export const Chatbot = () => {
       const finalText = stopVoiceListening();
       if (finalText) {
         setInputValue(finalText);
+        setLastMessageWasVoiceInput(true);
       }
     } else {
       clearVoiceError();
@@ -242,8 +244,11 @@ export const Chatbot = () => {
         fetchMedications();
       }
       
-      // Auto-speak when voice mode is enabled
-      if (voiceMode) await speak(botMessage.text);
+      // Auto-speak when voice mode is enabled OR last message was from voice input
+      if (voiceMode || lastMessageWasVoiceInput) await speak(botMessage.text);
+      
+      // Reset the flag
+      setLastMessageWasVoiceInput(false);
     } catch (error) {
       console.error('Chatbot error:', error);
       const botMessage: ChatMessage = {
