@@ -72,20 +72,22 @@ const aiLimiter = rateLimit({
 
 // ── JWT Middleware ────────────────────────────────────────────────────────────
 const requireAuth = (req, res, next) => {
-  console.log('requireAuth: Authorization header:', req.headers.authorization);
+  console.log('\n[requireAuth] New request:', req.method, req.url);
+  console.log('[requireAuth] All headers:', Object.fromEntries(Object.entries(req.headers)));
+  console.log('[requireAuth] Authorization header:', req.headers.authorization);
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log('requireAuth: No or invalid Authorization header');
+    console.log('[requireAuth] ❌ No or invalid Authorization header');
     return res.status(401).json({ error: 'Authentication required' });
   }
   const token = authHeader.slice(7);
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    console.log('requireAuth: decoded token:', decoded);
+    console.log('[requireAuth] ✅ Valid token, decoded:', decoded);
     req.user = decoded; // { id, email, role }
     next();
   } catch (err) {
-    console.error('requireAuth: JWT error:', err);
+    console.error('[requireAuth] ❌ JWT error:', err);
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 };

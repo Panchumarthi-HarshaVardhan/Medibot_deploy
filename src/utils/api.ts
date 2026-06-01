@@ -25,13 +25,16 @@ export const apiFetch = (path: string, opts?: RequestInit): Promise<Response> =>
 /** Returns Authorization header from sessionStorage token, if present */
 export const authHeaders = (): Record<string, string> => {
   const stored = sessionStorage.getItem('health_app_user');
+  console.log('[authHeaders] sessionStorage:', stored);
   if (!stored) return { 'Content-Type': 'application/json' };
   try {
     const user = JSON.parse(stored);
+    console.log('[authHeaders] Parsed user:', user, 'has token:', !!user.token);
     return user?.token
       ? { 'Content-Type': 'application/json', Authorization: `Bearer ${user.token}` }
       : { 'Content-Type': 'application/json' };
-  } catch {
+  } catch (err) {
+    console.error('[authHeaders] JSON parse error:', err);
     return { 'Content-Type': 'application/json' };
   }
 };
@@ -42,8 +45,11 @@ export async function authFetch(
   opts: RequestInit = {}
 ): Promise<Response> {
   const headers = new Headers(authHeaders());
+  console.log('[authFetch] Request to:', path, 'Headers:', Object.fromEntries(headers.entries()));
   if (opts.headers) {
     new Headers(opts.headers).forEach((value, key) => headers.set(key, value));
   }
-  return fetch(`${API_BASE}${path}`, { ...opts, headers });
+  const finalUrl = `${API_BASE}${path}`;
+  console.log('[authFetch] Final URL:', finalUrl);
+  return fetch(finalUrl, { ...opts, headers });
 }
