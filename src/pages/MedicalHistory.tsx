@@ -92,22 +92,22 @@ const MedicalHistory = () => {
     const historyText = `
 PATIENT HEALTH SUMMARY
 ======================
-Overall Status: ${analysisResult.overallHealthStatus}
+Overall Status: ${analysisResult.overallHealthStatus || 'N/A'}
 
 CHRONIC CONDITIONS:
-${analysisResult.chronicConditions.map((c: string) => '- ' + c).join('\n')}
+${(analysisResult.chronicConditions || []).map((c: string) => '- ' + c).join('\n') || '- None'}
 
 KEY RISK FACTORS:
-${analysisResult.keyRiskFactors.map((r: string) => '- ' + r).join('\n')}
+${(analysisResult.keyRiskFactors || []).map((r: string) => '- ' + r).join('\n') || '- None'}
 
 MEDICATION WARNINGS:
-${analysisResult.medicationInteractionsOrWarnings}
+${analysisResult.medicationInteractionsOrWarnings || 'None'}
 
 RECOMMENDATIONS:
-${analysisResult.preventativeRecommendations.map((r: string) => '- ' + r).join('\n')}
+${(analysisResult.preventativeRecommendations || []).map((r: string) => '- ' + r).join('\n') || '- None'}
 
 SUMMARY FOR DOCTOR:
-${analysisResult.summaryForDoctor}
+${analysisResult.summaryForDoctor || 'N/A'}
     `.trim();
 
     try {
@@ -195,16 +195,18 @@ ${analysisResult.summaryForDoctor}
                 </div>
                 
                 <div>
-                  <h3 className="font-medium mb-2 text-sm text-muted-foreground uppercase tracking-wider">Chronic Conditions</h3>
+                  <h3 className="font-medium mb-2 text-sm text-foreground/80 font-semibold uppercase tracking-wider">Chronic Conditions</h3>
                   <ul className="list-disc list-inside text-sm space-y-1">
-                    {analysisResult.chronicConditions.map((c: string, i: number) => <li key={i}>{c}</li>)}
+                    {(analysisResult.chronicConditions || []).map((c: string, i: number) => <li key={i}>{c}</li>)}
+                    {(!analysisResult.chronicConditions || analysisResult.chronicConditions.length === 0) && <li className="text-muted-foreground">None reported</li>}
                   </ul>
                 </div>
 
                 <div>
-                  <h3 className="font-medium mb-2 text-sm text-muted-foreground uppercase tracking-wider">Key Risk Factors</h3>
+                  <h3 className="font-medium mb-2 text-sm text-foreground/80 font-semibold uppercase tracking-wider">Key Risk Factors</h3>
                   <ul className="list-disc list-inside text-sm space-y-1">
-                    {analysisResult.keyRiskFactors.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                    {(analysisResult.keyRiskFactors || []).map((r: string, i: number) => <li key={i}>{r}</li>)}
+                    {(!analysisResult.keyRiskFactors || analysisResult.keyRiskFactors.length === 0) && <li className="text-muted-foreground">None identified</li>}
                   </ul>
                 </div>
 
@@ -254,7 +256,7 @@ ${analysisResult.summaryForDoctor}
                   </div>
                   <button
                     onClick={() => handleShareHistory(apt._id)}
-                    disabled={!analysisResult || sharingStatus[apt._id] === 'sharing' || sharingStatus[apt._id] === 'shared'}
+                    disabled={sharingStatus[apt._id] === 'sharing' || sharingStatus[apt._id] === 'shared'}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2
                       ${sharingStatus[apt._id] === 'shared' 
                         ? 'bg-success text-success-foreground' 

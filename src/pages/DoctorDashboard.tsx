@@ -21,6 +21,7 @@ const DoctorDashboard = () => {
   
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
+  const [selectedHistory, setSelectedHistory] = useState<{patientName: string, text: string} | null>(null);
   
   // Prescription Form
   const [medicationDetails, setMedicationDetails] = useState('');
@@ -221,8 +222,7 @@ const DoctorDashboard = () => {
                                   {apt.sharedHistory && (
                                     <button
                                       onClick={() => {
-                                        // Simple alert for now, could be a modal
-                                        alert("Patient Medical History:\n\n" + apt.sharedHistory);
+                                        setSelectedHistory({ patientName: apt.patientName, text: apt.sharedHistory! });
                                       }}
                                       className="text-xs bg-info text-info-foreground px-3 py-1.5 rounded-lg hover:bg-info/90 flex items-center gap-1"
                                       title="View Shared History"
@@ -344,6 +344,37 @@ const DoctorDashboard = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Shared History Modal */}
+        {selectedHistory && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-background rounded-2xl w-full max-w-2xl p-6 animate-fade-up flex flex-col max-h-[85vh]">
+              <div className="flex justify-between items-center mb-4 pb-4 border-b">
+                <div>
+                  <h2 className="text-xl font-semibold">Patient Medical History</h2>
+                  <p className="text-sm text-muted-foreground">Shared by {selectedHistory.patientName}</p>
+                </div>
+                <button onClick={() => setSelectedHistory(null)} className="text-muted-foreground hover:text-foreground">
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-4 text-sm whitespace-pre-wrap">
+                {selectedHistory.text}
+              </div>
+
+              <div className="flex justify-end pt-4 mt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => setSelectedHistory(null)}
+                  className="btn-medical"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
