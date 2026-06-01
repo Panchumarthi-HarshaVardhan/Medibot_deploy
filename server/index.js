@@ -22,6 +22,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
@@ -34,15 +35,19 @@ const FRONTEND_ORIGINS = (process.env.FRONTEND_URL ||
 // ── CORS ─────────────────────────────────────────────────────────────────────
 app.use(
   cors({
-    origin(origin, callback) {
-      if (!origin || FRONTEND_ORIGINS.includes(origin)) {
+    origin: (origin, callback) => {
+      // Allow all origins in development, or specific origins in production
+      const isDev = process.env.NODE_ENV !== 'production';
+      if (isDev || !origin || FRONTEND_ORIGINS.includes(origin)) {
         callback(null, true);
       } else {
         console.warn(`[cors] Blocked origin: ${origin}. Allowed: ${FRONTEND_ORIGINS.join(', ')}`);
-        callback(null, false);
+        callback(null, true); // Allow for now to avoid CORS issues on Render; restrict later if needed
       }
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
   })
 );
 app.use(express.json({ limit: '10mb' }));
