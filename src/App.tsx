@@ -16,6 +16,7 @@ import Medications from "./pages/Medications";
 import HealthTips from "./pages/HealthTips";
 import Profile from "./pages/Profile";
 import MedicalHistory from "./pages/MedicalHistory";
+import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,38 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Intercept patient users who haven't completed onboarding
+  if (user.role === 'patient' && (!user.age || !user.gender)) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Onboarding Route wrapper
+const OnboardingRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, isLoading } = useAuthContext();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.role !== 'patient') {
+    return <Navigate to="/doctor-dashboard" replace />;
+  }
+
+  if (user.age && user.gender) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -81,6 +114,14 @@ const AppRoutes = () => {
           <PublicRoute>
             <Signup />
           </PublicRoute>
+        }
+      />
+      <Route
+        path="/onboarding"
+        element={
+          <OnboardingRoute>
+            <Onboarding />
+          </OnboardingRoute>
         }
       />
       <Route

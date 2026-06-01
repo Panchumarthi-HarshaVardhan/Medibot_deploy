@@ -181,7 +181,7 @@ ${analysisResult.summaryForDoctor || 'N/A'}
                 <button
                   onClick={handleAnalyzeHistory}
                   disabled={isAnalyzing}
-                  className="btn-medical-outline flex items-center gap-2"
+                  className="btn-medical flex items-center justify-center gap-2 mt-4 px-6 py-2"
                 >
                   {isAnalyzing ? <Loader2 className="animate-spin" size={18} /> : null}
                   {isAnalyzing ? 'Analyzing...' : 'Generate Analysis'}

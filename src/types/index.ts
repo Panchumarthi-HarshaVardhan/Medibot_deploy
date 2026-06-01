@@ -8,6 +8,8 @@ export interface User {
   phone?: string;
   profileImage?: string;
   medicalHistory?: string | null;
+  age?: number | null;
+  gender?: 'male' | 'female' | 'other' | null;
   averageRating?: number;
   ratingCount?: number;
   token?: string; // JWT issued by server

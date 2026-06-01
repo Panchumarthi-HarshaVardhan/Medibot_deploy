@@ -14,7 +14,7 @@ async function run() {
   const apt = await Appointment.findOne();
   apt.status = 'accepted';
   await apt.save();
-  
+
   // Now simulate the endpoint logic
   try {
     const historyText = "Test history text";

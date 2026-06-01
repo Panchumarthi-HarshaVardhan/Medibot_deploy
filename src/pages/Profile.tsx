@@ -22,7 +22,8 @@ import {
   Star,
   Edit,
   Check,
-  X
+  X,
+  Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -37,6 +38,30 @@ const Profile = () => {
   const [nameInput, setNameInput] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const getCookie = (name: string) => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift();
+    return null;
+  };
+
+  const currentLangCookie = getCookie('googtrans');
+  const initialLang = currentLangCookie ? currentLangCookie.split('/').pop() || 'en' : 'en';
+  const [language, setLanguage] = useState(initialLang);
+
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const lang = e.target.value;
+    setLanguage(lang);
+    if (lang === 'en') {
+      document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
+    } else {
+      document.cookie = `googtrans=/en/${lang}; path=/`;
+      document.cookie = `googtrans=/en/${lang}; path=/; domain=${window.location.hostname};`;
+    }
+    window.location.reload();
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -512,9 +537,33 @@ const Profile = () => {
                   <span className="font-medium text-primary">{profile?.specialization || 'Not set'}</span>
                 </div>
               )}
-              <div className="flex items-center justify-between py-3">
+              <div className="flex items-center justify-between py-3 border-b border-border/50">
                 <span className="text-sm text-muted-foreground">Member Since</span>
                 <span className="font-medium text-foreground">{memberSince}</span>
+              </div>
+              <div className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Globe size={16} />
+                  <span>Language</span>
+                </div>
+                <select
+                  value={language}
+                  onChange={handleLanguageChange}
+                  className="px-2 py-1 text-sm border border-border rounded bg-card outline-none focus:ring-1 focus:ring-primary/50"
+                >
+                  <option value="en">English</option>
+                  <option value="hi">Hindi (हिन्दी)</option>
+                  <option value="te">Telugu (తెలుగు)</option>
+                  <option value="ta">Tamil (தமிழ்)</option>
+                  <option value="kn">Kannada (ಕನ್ನಡ)</option>
+                  <option value="ml">Malayalam (മലയാളം)</option>
+                  <option value="mr">Marathi (मराठी)</option>
+                  <option value="bn">Bengali (বাংলা)</option>
+                  <option value="gu">Gujarati (ગુજરાતી)</option>
+                  <option value="ur">Urdu (اردو)</option>
+                  <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
+                  <option value="or">Odia (ଓଡ଼ିଆ)</option>
+                </select>
               </div>
             </div>
           </div>
