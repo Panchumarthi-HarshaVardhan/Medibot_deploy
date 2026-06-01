@@ -1,19 +1,27 @@
 import nodemailer from 'nodemailer';
 
-const hasEmailConfig = Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD);
+let transporter = null;
+let isInitialized = false;
 
-const transporter = hasEmailConfig
-  ? nodemailer.createTransport({
+const getTransporter = () => {
+  if (isInitialized) return transporter;
+  
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+    transporter = nodemailer.createTransport({
       service: process.env.EMAIL_SERVICE || 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD
       }
-    })
-  : null;
+    });
+  }
+  isInitialized = true;
+  return transporter;
+};
 
 export const sendOtpEmail = async (email, otp, purpose = 'verification') => {
-  if (!transporter) {
+  const mailTransporter = getTransporter();
+  if (!mailTransporter) {
     console.warn(
       `[email] Missing EMAIL_USER or EMAIL_PASSWORD. OTP for ${email} (${purpose}) is ${otp}`
     );
@@ -21,7 +29,7 @@ export const sendOtpEmail = async (email, otp, purpose = 'verification') => {
   }
 
   try {
-    await transporter.sendMail({
+    await mailTransporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
       subject: purpose === 'login' ? 'Your Login OTP Code' : 'Verify your account',
@@ -44,13 +52,14 @@ export const sendOtpEmail = async (email, otp, purpose = 'verification') => {
 };
 
 export const sendMedicationReminderEmail = async (email, medicineName, dosage, time) => {
-  if (!transporter) {
+  const mailTransporter = getTransporter();
+  if (!mailTransporter) {
     console.warn(`[email] Missing config. Medication reminder for ${email}: ${medicineName} ${dosage} at ${time}`);
     return { delivered: false, reason: 'missing_credentials' };
   }
 
   try {
-    await transporter.sendMail({
+    await mailTransporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
       subject: `💊 Medication Reminder: ${medicineName}`,
