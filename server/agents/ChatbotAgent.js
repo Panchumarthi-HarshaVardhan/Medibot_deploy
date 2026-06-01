@@ -73,6 +73,9 @@ class ChatbotAgent extends BaseAgent {
 User message: "${userInput}"
 Known context: ${JSON.stringify(context)}
 
+Important: For date, accept ANY date format (YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, "June 3rd", "tomorrow", "today", etc.) and convert it to YYYY-MM-DD format.
+For time, accept any 12-hour or 24-hour format and convert to HH:mm (24-hour).
+
 Return JSON only:
 {
   "action": "chat" | "symptom_check" | "book_appointment" | "medication_reminder" | "doctor_appointment_update" | "prescribe_medicine" | "analyze_history" | "update_history",
@@ -338,7 +341,69 @@ Important: If the user only says hi/hello/hey, reply briefly (one sentence) abou
     const match = input.match(/dr\.?\s+([a-zA-Z\s]+?)(?=\s+on\s+\d{4}-\d{2}-\d{2}|\s+at\s+\d{1,2}:\d{2}|\s+for\s+|$)/i);
     return match ? match[1].trim().replace(/\s+/g, ' ') : null;
   }
-  extractDate(input) { const match = input.match(/\b\d{4}-\d{2}-\d{2}\b/); return match ? match[0] : null; }
+  extractDate(input) {
+    // Try YYYY-MM-DD first
+    let match = input.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
+    if (match) {
+      return `${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}`;
+    }
+    // Try MM/DD/YYYY or DD/MM/YYYY (we'll assume MM/DD/YYYY for now, or check which part > 12)
+    match = input.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{4}|\d{2})\b/);
+    if (match) {
+      let month, day, year;
+      if (match[3].length === 2) {
+        year = '20' + match[3];
+      } else {
+        year = match[3];
+      }
+      const m1 = Number(match[1]);
+      const m2 = Number(match[2]);
+      if (m1 > 12) {
+        month = m2;
+        day = m1;
+      } else if (m2 > 12) {
+        month = m1;
+        day = m2;
+      } else {
+        // Default to MM/DD/YYYY
+        month = m1;
+        day = m2;
+      }
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+    // Try natural dates like "June 3", "June 3rd", "Jun 3 2025"
+    let naturalDateMatch = input.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{4}))?/i);
+    if (naturalDateMatch) {
+      const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      const monthName = naturalDateMatch[1].toLowerCase().substring(0, 3);
+      const month = monthNames.indexOf(monthName) + 1;
+      const day = Number(naturalDateMatch[2]);
+      const year = naturalDateMatch[3] ? Number(naturalDateMatch[3]) : new Date().getFullYear();
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+    // Try natural dates like "3 June", "3rd June", "3 June 2025"
+    naturalDateMatch = input.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?(?:\s+(\d{4}))?/i);
+    if (naturalDateMatch) {
+      const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      const monthName = naturalDateMatch[2].toLowerCase().substring(0, 3);
+      const month = monthNames.indexOf(monthName) + 1;
+      const day = Number(naturalDateMatch[1]);
+      const year = naturalDateMatch[3] ? Number(naturalDateMatch[3]) : new Date().getFullYear();
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+    // Try "tomorrow"
+    if (/\btomorrow\b/i.test(input)) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+    }
+    // Try "today"
+    if (/\btoday\b/i.test(input)) {
+      const today = new Date();
+      return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    }
+    return null;
+  }
   extractTime(input) {
     const match = input.match(/\b(\d{1,2}):(\d{2})(?:\s?(am|pm))?\b/i);
     if (!match) return null;

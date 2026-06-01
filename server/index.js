@@ -596,9 +596,10 @@ app.put('/api/profile/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     if (req.user.id !== id) return res.status(403).json({ error: 'Access denied' });
-    const { phone, profileImage } = req.body;
+    const { phone, profileImage, name } = req.body;
     const updateFields = {};
     if (phone !== undefined) updateFields.phone = phone;
+    if (name !== undefined) updateFields.name = name;
     if (profileImage !== undefined) {
       if (profileImage && profileImage.length > 5 * 1024 * 1024) return res.status(400).json({ error: 'Image too large. Max 5MB.' });
       updateFields.profileImage = profileImage;

@@ -32,7 +32,9 @@ const Profile = () => {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingPhone, setEditingPhone] = useState(false);
+  const [editingName, setEditingName] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
+  const [nameInput, setNameInput] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -51,6 +53,7 @@ const Profile = () => {
             _id: data._id?.toString?.() || user.id,
           });
           setPhoneInput(data.phone || '');
+          setNameInput(data.name || user.name || '');
         } else if (response.status === 401) {
           toast.error('Session expired. Please sign in again.');
         } else {
@@ -75,6 +78,7 @@ const Profile = () => {
               totalPrescriptions: 0,
             },
           });
+          setNameInput(user.name || '');
           toast.error('Could not load full profile stats. Showing basic account info.');
         }
       } catch (error) {
@@ -106,6 +110,30 @@ const Profile = () => {
     } catch (error) {
       console.error('Failed to update phone:', error);
       toast.error('Failed to update phone');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleNameSave = async () => {
+    if (!user) return;
+    setIsUpdating(true);
+    try {
+      const response = await authFetch(`/api/profile/${user.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: nameInput }),
+      });
+      if (response.ok) {
+        const updatedUser = await response.json();
+        setProfile(updatedUser);
+        // Update user context with all existing properties + new name
+        setUser(prev => prev ? { ...prev, name: updatedUser.name } : null);
+        setEditingName(false);
+        toast.success('Name updated!');
+      }
+    } catch (error) {
+      console.error('Failed to update name:', error);
+      toast.error('Failed to update name');
     } finally {
       setIsUpdating(false);
     }
@@ -432,7 +460,43 @@ const Profile = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between py-3 border-b border-border/50">
                 <span className="text-sm text-muted-foreground">Full Name</span>
-                <span className="font-medium text-foreground">{user?.name || 'User'}</span>
+                {editingName ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
+                      className="w-48 px-2 py-1 text-sm border border-border rounded bg-card"
+                      placeholder="Enter full name"
+                    />
+                    <button
+                      onClick={handleNameSave}
+                      disabled={isUpdating}
+                      className="p-1 text-success hover:bg-success/10 rounded"
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingName(false);
+                        setNameInput(profile?.name || user?.name || '');
+                      }}
+                      className="p-1 text-muted-foreground hover:bg-muted/50 rounded"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium text-foreground">{profile?.name || user?.name || 'User'}</span>
+                    <button
+                      onClick={() => setEditingName(true)}
+                      className="p-1 text-muted-foreground hover:text-foreground"
+                    >
+                      <Edit size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="flex items-center justify-between py-3 border-b border-border/50">
                 <span className="text-sm text-muted-foreground">Email</span>
