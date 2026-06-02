@@ -7,13 +7,27 @@ const getTransporter = () => {
   if (isInitialized) return transporter;
   
   if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
-    transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
+    const service = process.env.EMAIL_SERVICE || 'gmail';
+    
+    if (service.toLowerCase() === 'gmail') {
+      transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASSWORD
+        }
+      });
+    } else {
+      transporter = nodemailer.createTransport({
+        service,
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASSWORD
+        }
+      });
+    }
   }
   isInitialized = true;
   return transporter;

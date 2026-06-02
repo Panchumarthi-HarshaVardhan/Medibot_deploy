@@ -20,6 +20,7 @@ import { sendOtpEmail, sendMedicationReminderEmail } from './utils/email.js';
 import voiceRouter from './routes/voice.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import cron from 'node-cron';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -99,28 +100,26 @@ const issueToken = (user) =>
 const scheduledReminders = new Map();
 
 function scheduleEmailReminder(reminder, userEmail) {
-  if (!reminder.reminderEnabled || !reminder.times || reminder.times.length === 0) return;
   const reminderId = reminder._id.toString();
+  
   if (scheduledReminders.has(reminderId)) {
-    scheduledReminders.get(reminderId).forEach(t => clearTimeout(t));
+    scheduledReminders.get(reminderId).forEach(t => t.stop());
+    scheduledReminders.delete(reminderId);
   }
-  const timers = [];
-  const now = new Date();
+  
+  if (!reminder.reminderEnabled || !reminder.times || reminder.times.length === 0) return;
+  
+  const tasks = [];
+  
   reminder.times.forEach(timeStr => {
     const [hours, minutes] = timeStr.split(':').map(Number);
-    const target = new Date();
-    target.setHours(hours, minutes, 0, 0);
-    if (target <= now) target.setDate(target.getDate() + 1);
-    const delay = target.getTime() - now.getTime();
-    if (delay > 0 && delay < 24 * 60 * 60 * 1000) {
-      const timer = setTimeout(async () => {
-        await sendMedicationReminderEmail(userEmail, reminder.name, reminder.dosage, timeStr);
-        scheduleEmailReminder(reminder, userEmail);
-      }, delay);
-      timers.push(timer);
-    }
+    const task = cron.schedule(`${minutes} ${hours} * * *`, async () => {
+      await sendMedicationReminderEmail(userEmail, reminder.name, reminder.dosage, timeStr);
+    });
+    tasks.push(task);
   });
-  scheduledReminders.set(reminderId, timers);
+  
+  scheduledReminders.set(reminderId, tasks);
 }
 
 async function rescheduleAllReminders() {
@@ -538,6 +537,12 @@ app.put('/api/medications/:id', requireAuth, async (req, res) => {
     if (!reminder) return res.status(404).json({ error: 'Reminder not found' });
     if (reminder.user_id.toString() !== req.user.id) return res.status(403).json({ error: 'Access denied' });
     const updated = await MedicationReminder.findByIdAndUpdate(id, req.body, { new: true });
+    
+    const user = await User.findById(updated.user_id);
+    if (user?.email) {
+      scheduleEmailReminder(updated, user.email);
+    }
+    
     res.json(updated);
   } catch (err) {
     console.error('Error updating medication reminder:', err);
@@ -553,7 +558,7 @@ app.delete('/api/medications/:id', requireAuth, async (req, res) => {
     if (reminder.user_id.toString() !== req.user.id) return res.status(403).json({ error: 'Access denied' });
     await MedicationReminder.findByIdAndDelete(id);
     if (scheduledReminders.has(id)) {
-      scheduledReminders.get(id).forEach(t => clearTimeout(t));
+      scheduledReminders.get(id).forEach(t => t.stop());
       scheduledReminders.delete(id);
     }
     res.json({ message: 'Medication reminder deleted' });
