@@ -1,0 +1,13 @@
+# This is a Node.js project, so the actual dependencies are managed in package.json.
+# Run `npm install` to install them.
+# 
+# System Requirements:
+# - Node.js (v18 or higher recommended)
+# - npm (v9 or higher recommended)
+# - MongoDB (v6.0 or higher)
+# - Git
+# - React js
+# - Express js
+# - Groq API Key
+# - Google Cloud TTS API Key
+
