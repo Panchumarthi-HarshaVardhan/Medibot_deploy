@@ -29,6 +29,14 @@ export const usePrescriptions = () => {
           duration: pres.duration || null,
           timesPerDay: pres.times_per_day || null,
           instructions: pres.instructions,
+          medications: pres.medications ? pres.medications.map((m: any) => ({
+            name: m.name,
+            dosage: m.dosage,
+            duration: m.duration,
+            timesPerDay: m.times_per_day,
+            instructions: m.instructions,
+            reminderTimes: m.reminder_times || []
+          })) : [],
           createdAt: new Date(pres.createdAt).toLocaleDateString()
         }));
         setPrescriptions(mappedPrescriptions);

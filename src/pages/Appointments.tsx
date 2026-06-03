@@ -11,7 +11,8 @@ import {
   Check,
   X,
   Plus,
-  Star
+  Star,
+  Search
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -31,6 +32,9 @@ const Appointments = () => {
   const [selectedDoctorId, setSelectedDoctorId] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const fetchDoctors = async () => {
@@ -141,6 +145,20 @@ const Appointments = () => {
               {showForm ? 'Cancel' : 'Book Appointment'}
             </button>
           )}
+        </div>
+
+        {/* Search Bar */}
+        <div className="mb-6 animate-fade-up">
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+            <input
+              type="text"
+              placeholder="Search appointments by doctor, specialization..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input-medical pl-10"
+            />
+          </div>
         </div>
 
         {/* Booking Form */}
@@ -254,7 +272,9 @@ const Appointments = () => {
               )}
             </div>
           ) : (
-            upcomingAppointments.map((apt) => (
+            upcomingAppointments
+              .filter(apt => apt.doctorName.toLowerCase().includes(searchQuery.toLowerCase()) || apt.specialization?.toLowerCase().includes(searchQuery.toLowerCase()) || apt.patientName.toLowerCase().includes(searchQuery.toLowerCase()))
+              .map((apt) => (
               <div
                 key={apt.id}
                 className="card-medical flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-up"
@@ -317,7 +337,9 @@ const Appointments = () => {
         {completedAppointments.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold mb-4">Completed Appointments</h2>
-            {completedAppointments.map((apt) => (
+            {completedAppointments
+              .filter(apt => apt.doctorName.toLowerCase().includes(searchQuery.toLowerCase()) || apt.specialization?.toLowerCase().includes(searchQuery.toLowerCase()) || apt.patientName.toLowerCase().includes(searchQuery.toLowerCase()))
+              .map((apt) => (
               <div
                 key={apt.id}
                 className="card-medical flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-up"

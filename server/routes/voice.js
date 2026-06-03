@@ -56,7 +56,7 @@ const cleanForSpeech = (text) => {
 
 // POST /api/voice/speak
 router.post('/speak', async (req, res) => {
-  const { text, voiceName, speakingRate } = req.body;
+  const { text, voiceName, speakingRate, languageCode } = req.body;
 
   if (!text || typeof text !== 'string' || !text.trim()) {
     return res.status(400).json({ error: 'text is required' });
@@ -71,11 +71,30 @@ router.post('/speak', async (req, res) => {
 
   const cleanText = cleanForSpeech(text);
 
+  // Map standard language codes to Google TTS voice names if voiceName is not explicitly provided
+  let resolvedVoiceName = voiceName;
+  let resolvedLangCode = 'en-US';
+  if (!resolvedVoiceName) {
+    if (languageCode === 'hi') {
+      resolvedVoiceName = 'hi-IN-Neural2-A';
+      resolvedLangCode = 'hi-IN';
+    } else if (languageCode === 'te') {
+      resolvedVoiceName = 'te-IN-Standard-A';
+      resolvedLangCode = 'te-IN';
+    } else {
+      resolvedVoiceName = DEFAULT_VOICE;
+    }
+  } else {
+    // If voiceName is provided, try to extract language code from it
+    const parts = resolvedVoiceName.split('-');
+    if (parts.length >= 2) resolvedLangCode = `${parts[0]}-${parts[1]}`;
+  }
+
   const requestBody = {
     input: { text: cleanText },
     voice: {
-      languageCode: 'en-US',
-      name: voiceName || DEFAULT_VOICE,
+      languageCode: resolvedLangCode,
+      name: resolvedVoiceName,
       // ssmlGender is inferred from the voice name — no need to set manually
     },
     audioConfig: {

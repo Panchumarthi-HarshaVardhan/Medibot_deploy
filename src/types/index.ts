@@ -40,11 +40,19 @@ export interface Prescription {
   doctorId: string;
   doctorName?: string;
   patientName?: string;
-  medicationDetails: string;
-  dosage: string;
-  duration?: string;
-  timesPerDay?: number;
-  instructions: string;
+  medicationDetails: string; // Legacy
+  dosage: string; // Legacy
+  duration?: string; // Legacy
+  timesPerDay?: number; // Legacy
+  instructions: string; // Legacy
+  medications?: {
+    name: string;
+    dosage: string;
+    duration?: string;
+    timesPerDay?: number;
+    instructions?: string;
+    reminderTimes?: string[];
+  }[];
   createdAt: string;
 }
 

@@ -61,6 +61,11 @@ const userSchema = new mongoose.Schema({
     enum: ['male', 'female', 'other', null],
     default: null
   },
+  language: {
+    type: String,
+    enum: ['en', 'hi', 'te'],
+    default: 'en'
+  },
   rating: {
     totalScore: { type: Number, default: 0 },
     count: { type: Number, default: 0 }

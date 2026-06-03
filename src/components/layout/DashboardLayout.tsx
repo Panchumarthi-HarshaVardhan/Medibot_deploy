@@ -1,12 +1,15 @@
 import { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { Chatbot } from '@/components/chatbot/Chatbot';
+import { useAppointmentReminders } from '@/hooks/useAppointmentReminders';
 
 interface DashboardLayoutProps {
   children: ReactNode;
 }
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
+  useAppointmentReminders();
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />

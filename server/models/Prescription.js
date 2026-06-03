@@ -16,9 +16,17 @@ const prescriptionSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  medications: [{
+    name: { type: String, required: true },
+    dosage: { type: String },
+    duration: { type: String },
+    times_per_day: { type: Number },
+    instructions: { type: String },
+    reminder_times: [{ type: String }]
+  }],
+  // Legacy fields for backward compatibility
   medication_details: {
-    type: String,
-    required: true
+    type: String
   },
   dosage: {
     type: String

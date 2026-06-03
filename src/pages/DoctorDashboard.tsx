@@ -21,7 +21,9 @@ import {
   Stethoscope,
   ChevronDown,
   ChevronUp,
-  History
+  History,
+  Download,
+  Plus
 } from 'lucide-react';
 import { useAuthContext } from '@/context/AuthContext';
 import { useAppointments } from '@/hooks/useAppointments';
@@ -124,10 +126,7 @@ const DoctorDashboard = () => {
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
 
   // Prescription Form
-  const [medicationDetails, setMedicationDetails] = useState('');
-  const [dosage, setDosage] = useState('');
-  const [prescriptionDuration, setPrescriptionDuration] = useState('');
-  const [prescriptionTimesPerDay, setPrescriptionTimesPerDay] = useState('1');
+  const [medications, setMedications] = useState([{ name: '', dosage: '', duration: '', timesPerDay: 1, reminderTimes: ['08:00'] }]);
   const [instructions, setInstructions] = useState('');
 
   // Stats calculation
@@ -195,10 +194,13 @@ const DoctorDashboard = () => {
           appointment_id: selectedAppointment.id,
           patient_id: selectedAppointment.patientId,
           doctor_id: user?.id,
-          medication_details: medicationDetails,
-          dosage,
-          duration: prescriptionDuration || null,
-          times_per_day: parseInt(prescriptionTimesPerDay) || null,
+          medications: medications.map(m => ({
+            name: m.name,
+            dosage: m.dosage,
+            duration: m.duration || null,
+            times_per_day: m.timesPerDay || null,
+            reminder_times: m.reminderTimes || []
+          })),
           instructions
         }),
       });
@@ -206,10 +208,7 @@ const DoctorDashboard = () => {
       if (response.ok) {
         toast.success('Prescription sent successfully');
         setShowPrescriptionModal(false);
-        setMedicationDetails('');
-        setDosage('');
-        setPrescriptionDuration('');
-        setPrescriptionTimesPerDay('1');
+        setMedications([{ name: '', dosage: '', duration: '', timesPerDay: 1, reminderTimes: ['08:00'] }]);
         setInstructions('');
         
         await updateStatus(selectedAppointment.id, 'completed');
@@ -557,52 +556,131 @@ const DoctorDashboard = () => {
               </div>
 
               <form onSubmit={handleSubmitPrescription} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Medication Details</label>
-                  <textarea
-                    value={medicationDetails}
-                    onChange={(e) => setMedicationDetails(e.target.value)}
-                    className="input-medical w-full min-h-[80px]"
-                    placeholder="e.g. Paracetamol 500mg"
-                    required
-                  />
+                <div className="flex justify-between items-center">
+                  <h3 className="font-medium">Medications</h3>
+                  <button 
+                    type="button" 
+                    onClick={() => setMedications([...medications, { name: '', dosage: '', duration: '', timesPerDay: 1, reminderTimes: ['08:00'] }])}
+                    className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 flex items-center gap-1"
+                  >
+                    <Plus size={14} /> Add Medicine
+                  </button>
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium mb-2">Dosage</label>
-                  <input
-                    type="text"
-                    value={dosage}
-                    onChange={(e) => setDosage(e.target.value)}
-                    className="input-medical w-full"
-                    placeholder="e.g. 1-0-1 after food"
-                    required
-                  />
-                </div>
+                <div className="max-h-[40vh] overflow-y-auto space-y-4 pr-2">
+                  {medications.map((med, index) => (
+                    <div key={index} className="p-4 border border-border rounded-xl space-y-3 relative bg-muted/10">
+                      {medications.length > 1 && (
+                        <button 
+                          type="button"
+                          onClick={() => setMedications(medications.filter((_, i) => i !== index))}
+                          className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                      
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Medicine Name</label>
+                        <input
+                          type="text"
+                          value={med.name}
+                          onChange={(e) => {
+                            const newMeds = [...medications];
+                            newMeds[index].name = e.target.value;
+                            setMedications(newMeds);
+                          }}
+                          className="input-medical w-full text-sm py-1.5"
+                          placeholder="e.g. Paracetamol 500mg"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Dosage Instructions</label>
+                        <input
+                          type="text"
+                          value={med.dosage}
+                          onChange={(e) => {
+                            const newMeds = [...medications];
+                            newMeds[index].dosage = e.target.value;
+                            setMedications(newMeds);
+                          }}
+                          className="input-medical w-full text-sm py-1.5"
+                          placeholder="e.g. 1-0-1 after food"
+                          required
+                        />
+                      </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Duration</label>
-                    <input
-                      type="text"
-                      value={prescriptionDuration}
-                      onChange={(e) => setPrescriptionDuration(e.target.value)}
-                      className="input-medical w-full"
-                      placeholder="e.g. 7 days, 2 weeks"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Times Per Day</label>
-                    <select
-                      value={prescriptionTimesPerDay}
-                      onChange={(e) => setPrescriptionTimesPerDay(e.target.value)}
-                      className="input-medical w-full"
-                    >
-                      {[1, 2, 3, 4].map((num) => (
-                        <option key={num} value={num}>{num} time{num > 1 ? 's' : ''}/day</option>
-                      ))}
-                    </select>
-                  </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium mb-1">Duration</label>
+                          <input
+                            type="text"
+                            value={med.duration}
+                            onChange={(e) => {
+                              const newMeds = [...medications];
+                              newMeds[index].duration = e.target.value;
+                              setMedications(newMeds);
+                            }}
+                            className="input-medical w-full text-sm py-1.5"
+                            placeholder="e.g. 7 days"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium mb-1">Times/Day</label>
+                          <select
+                            value={med.timesPerDay}
+                            onChange={(e) => {
+                              const newMeds = [...medications];
+                              const newTimesPerDay = parseInt(e.target.value);
+                              newMeds[index].timesPerDay = newTimesPerDay;
+                              
+                              const defaultTimes = ['08:00', '13:00', '18:00', '22:00'];
+                              if (newTimesPerDay > newMeds[index].reminderTimes.length) {
+                                newMeds[index].reminderTimes = [
+                                  ...newMeds[index].reminderTimes,
+                                  ...defaultTimes.slice(newMeds[index].reminderTimes.length, newTimesPerDay)
+                                ];
+                              } else if (newTimesPerDay < newMeds[index].reminderTimes.length) {
+                                newMeds[index].reminderTimes = newMeds[index].reminderTimes.slice(0, newTimesPerDay);
+                              }
+                              
+                              setMedications(newMeds);
+                            }}
+                            className="input-medical w-full text-sm py-1.5"
+                          >
+                            <option value="1">Once a day</option>
+                            <option value="2">Twice a day</option>
+                            <option value="3">Three times a day</option>
+                            <option value="4">Four times a day</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Reminder Times Selection */}
+                      <div className="mt-3 bg-muted/30 p-3 rounded-lg border border-border/50">
+                        <label className="block text-xs font-medium mb-2">Reminder Times</label>
+                        <div className="flex flex-wrap gap-2">
+                          {med.reminderTimes.map((time, timeIndex) => (
+                            <div key={timeIndex} className="flex items-center gap-1.5 bg-background border border-border px-2 py-1 rounded-md">
+                              <Clock size={12} className="text-muted-foreground" />
+                              <input
+                                type="time"
+                                value={time}
+                                onChange={(e) => {
+                                  const newMeds = [...medications];
+                                  newMeds[index].reminderTimes[timeIndex] = e.target.value;
+                                  setMedications(newMeds);
+                                }}
+                                className="bg-transparent border-none p-0 text-xs focus:ring-0 w-[65px]"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 <div>
@@ -819,12 +897,38 @@ const DoctorDashboard = () => {
                         </p>
                       )}
                     </div>
-                    <button
-                      onClick={() => { setShowPatientHistoryModal(false); setPatientHistory(null); }}
-                      className="text-muted-foreground hover:text-foreground p-1"
-                    >
-                      <X size={22} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await authFetch(`/api/pdf/summary/${patientHistory.patient._id}`);
+                            if (!res.ok) throw new Error('Download failed');
+                            const blob = await res.blob();
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `Health_Summary_${patientHistory.patient.name?.replace(/\s+/g, '_') || 'Patient'}.pdf`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                          } catch (err) {
+                            toast.error('Failed to download PDF summary');
+                          }
+                        }}
+                        className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-lg hover:bg-primary/20 flex items-center gap-1.5 transition-colors"
+                        title="Download PDF Summary"
+                      >
+                        <Download size={14} />
+                        Summary
+                      </button>
+                      <button
+                        onClick={() => { setShowPatientHistoryModal(false); setPatientHistory(null); }}
+                        className="text-muted-foreground hover:text-foreground p-1 ml-2"
+                      >
+                        <X size={22} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Tabs */}

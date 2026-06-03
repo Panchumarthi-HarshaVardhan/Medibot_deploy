@@ -19,6 +19,7 @@ import MedicalRecord from './models/MedicalRecord.js';
 import { chatbotAgent, symptomCheckerAgent, medicationReminderAgent, medicalHistoryAnalyzerAgent, medicalRecordAnalyzerAgent } from './agents/index.js';
 import { sendOtpEmail, sendMedicationReminderEmail } from './utils/email.js';
 import voiceRouter from './routes/voice.js';
+import pdfRouter from './routes/pdf.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cron from 'node-cron';
@@ -59,6 +60,7 @@ connectDB();
 
 // Google Cloud TTS route (public)
 app.use('/api/voice', voiceRouter);
+app.use('/api/pdf', pdfRouter);
 
 // ── Rate Limiting ─────────────────────────────────────────────────────────────
 const authLimiter = rateLimit({
@@ -73,7 +75,7 @@ const aiLimiter = rateLimit({
 });
 
 // ── JWT Middleware ────────────────────────────────────────────────────────────
-const requireAuth = (req, res, next) => {
+export function requireAuth(req, res, next) {
   console.log('\n[requireAuth] New request:', req.method, req.url);
   console.log('[requireAuth] All headers:', Object.fromEntries(Object.entries(req.headers)));
   console.log('[requireAuth] Authorization header:', req.headers.authorization);
@@ -463,12 +465,20 @@ app.put('/api/appointments/:id/rate', requireAuth, async (req, res) => {
 
 // Prescriptions
 app.post('/api/prescriptions', requireAuth, async (req, res) => {
+  console.log('Received prescription payload:', req.body);
   try {
     if (req.user.role !== 'doctor') return res.status(403).json({ error: 'Only doctors can create prescriptions' });
-    const { appointment_id, patient_id, doctor_id, medication_details, dosage, instructions, duration, times_per_day } = req.body;
-    if (!appointment_id || !patient_id || !doctor_id || !medication_details) return res.status(400).json({ error: 'Missing required fields' });
+    const { appointment_id, patient_id, doctor_id, medication_details, dosage, instructions, duration, times_per_day, medications } = req.body;
+    if (!appointment_id || !patient_id || !doctor_id) {
+      console.log('Missing fields:', { appointment_id, patient_id, doctor_id });
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    if (!medication_details && (!medications || medications.length === 0)) {
+      console.log('Missing medications:', { medication_details, medications });
+      return res.status(400).json({ error: 'Medications are required' });
+    }
     if (req.user.id !== doctor_id) return res.status(403).json({ error: 'Cannot create prescription as another doctor' });
-    const newPrescription = new Prescription({ appointment_id, patient_id, doctor_id, medication_details, dosage, duration: duration || null, times_per_day: times_per_day || null, instructions });
+    const newPrescription = new Prescription({ appointment_id, patient_id, doctor_id, medication_details, dosage, duration: duration || null, times_per_day: times_per_day || null, instructions, medications });
     await newPrescription.save();
     res.status(201).json({ message: 'Prescription added successfully' });
   } catch (err) {
@@ -604,12 +614,13 @@ app.put('/api/profile/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     if (req.user.id !== id) return res.status(403).json({ error: 'Access denied' });
-    const { phone, profileImage, name, age, gender, medicalHistory } = req.body;
+    const { phone, profileImage, name, age, gender, medicalHistory, language } = req.body;
     const updateFields = {};
     if (phone !== undefined) updateFields.phone = phone;
     if (name !== undefined) updateFields.name = name;
     if (age !== undefined) updateFields.age = age;
     if (gender !== undefined) updateFields.gender = gender;
+    if (language !== undefined) updateFields.language = language;
     if (medicalHistory !== undefined) updateFields.medicalHistory = medicalHistory;
     if (profileImage !== undefined) {
       if (profileImage && profileImage.length > 5 * 1024 * 1024) return res.status(400).json({ error: 'Image too large. Max 5MB.' });
@@ -890,6 +901,7 @@ app.get('/api/patient-history/:patientId/doctor-view', requireAuth, async (req, 
 
     res.json({
       patient: {
+        _id: patient._id,
         name: patient.name,
         age: patient.age,
         gender: patient.gender,

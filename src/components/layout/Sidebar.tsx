@@ -10,10 +10,12 @@ import {
   X,
   Users,
   UserCircle,
-  Activity
+  Activity,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { useAuthContext } from '@/context/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
 const patientNavItems = [
@@ -36,6 +38,20 @@ export const Sidebar = () => {
   const { user, logout } = useAuthContext();
   const location = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('theme') === 'dark' || 
+      (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -104,8 +120,15 @@ export const Sidebar = () => {
           ))}
         </nav>
 
-        {/* Logout Button */}
-        <div className="p-4 border-t border-sidebar-border">
+        {/* Footer Actions: Theme Toggle & Logout */}
+        <div className="p-4 border-t border-sidebar-border space-y-2">
+          <button
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className="sidebar-link w-full text-sidebar-foreground/80 hover:text-sidebar-foreground"
+          >
+            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+            <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
           <button
             onClick={logout}
             className="sidebar-link w-full text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-destructive/20"

@@ -39,28 +39,26 @@ const Profile = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const getCookie = (name: string) => {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop()?.split(';').shift();
-    return null;
-  };
+  const [language, setLanguage] = useState('en');
 
-  const currentLangCookie = getCookie('googtrans');
-  const initialLang = currentLangCookie ? currentLangCookie.split('/').pop() || 'en' : 'en';
-  const [language, setLanguage] = useState(initialLang);
-
-  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleLanguageChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const lang = e.target.value;
     setLanguage(lang);
-    if (lang === 'en') {
-      document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-      document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
-    } else {
-      document.cookie = `googtrans=/en/${lang}; path=/`;
-      document.cookie = `googtrans=/en/${lang}; path=/; domain=${window.location.hostname};`;
+    if (!user) return;
+    
+    // Save to backend
+    try {
+      const response = await authFetch(`/api/profile/${user.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ language: lang }),
+      });
+      if (response.ok) {
+        toast.success('Language preference updated');
+        // Update context if necessary, though chatbot uses context.userLanguage
+      }
+    } catch (err) {
+      console.error('Failed to update language', err);
     }
-    window.location.reload();
   };
 
   useEffect(() => {
@@ -79,6 +77,7 @@ const Profile = () => {
           });
           setPhoneInput(data.phone || '');
           setNameInput(data.name || user.name || '');
+          setLanguage(data.language || 'en');
         } else if (response.status === 401) {
           toast.error('Session expired. Please sign in again.');
         } else {
@@ -554,15 +553,6 @@ const Profile = () => {
                   <option value="en">English</option>
                   <option value="hi">Hindi (हिन्दी)</option>
                   <option value="te">Telugu (తెలుగు)</option>
-                  <option value="ta">Tamil (தமிழ்)</option>
-                  <option value="kn">Kannada (ಕನ್ನಡ)</option>
-                  <option value="ml">Malayalam (മലയാളം)</option>
-                  <option value="mr">Marathi (मराठी)</option>
-                  <option value="bn">Bengali (বাংলা)</option>
-                  <option value="gu">Gujarati (ગુજરાતી)</option>
-                  <option value="ur">Urdu (اردو)</option>
-                  <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
-                  <option value="or">Odia (ଓଡ଼ିଆ)</option>
                 </select>
               </div>
             </div>

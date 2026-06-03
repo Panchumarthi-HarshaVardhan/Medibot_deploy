@@ -169,24 +169,33 @@ const Medications = () => {
     return '7 days';
   };
 
-  const handleAddFromPrescription = (prescription: Prescription) => {
-    setName(prescription.medicationDetails);
-    setDosage(prescription.dosage);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleAddFromPrescription = (prescription: Prescription, specificMed?: any) => {
+    setName(specificMed ? specificMed.name : prescription.medicationDetails);
+    setDosage(specificMed ? specificMed.dosage : prescription.dosage);
 
-    // Use doctor-specified values if available, otherwise parse
-    if (prescription.timesPerDay) {
-      setTimesPerDay(String(prescription.timesPerDay));
-      const defaultTimeMap = ['08:00', '13:00', '18:00', '22:00'];
-      setTimes(defaultTimeMap.slice(0, prescription.timesPerDay));
+    const targetTimesPerDay = specificMed ? specificMed.timesPerDay : prescription.timesPerDay;
+    const targetDuration = specificMed ? specificMed.duration : prescription.duration;
+    const targetInstructions = specificMed ? specificMed.instructions : prescription.instructions;
+    const targetReminderTimes = specificMed ? specificMed.reminderTimes : null;
+
+    if (targetTimesPerDay) {
+      setTimesPerDay(String(targetTimesPerDay));
+      if (targetReminderTimes && targetReminderTimes.length > 0) {
+        setTimes(targetReminderTimes);
+      } else {
+        const defaultTimeMap = ['08:00', '13:00', '18:00', '22:00'];
+        setTimes(defaultTimeMap.slice(0, targetTimesPerDay));
+      }
     } else {
-      const parsed = parseDosagePattern(prescription.dosage || '');
+      const parsed = parseDosagePattern((specificMed ? specificMed.dosage : prescription.dosage) || '');
       setTimesPerDay(String(parsed.count));
       setTimes(parsed.times);
     }
 
     const duration = parseDuration(
-      prescription.instructions || '',
-      prescription.duration || ''
+      targetInstructions || '',
+      targetDuration || ''
     );
     setDuration(duration);
     setShowForm(true);
@@ -448,48 +457,107 @@ const Medications = () => {
                                             </h3>
                                             <p className="text-sm text-muted-foreground">{pres.createdAt}</p>
                                         </div>
-                                        <button 
-                                            onClick={() => handleAddFromPrescription(pres)}
-                                            className="text-sm bg-primary/10 text-primary px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors flex items-center gap-2 self-start"
-                                        >
-                                            <Plus size={16} />
-                                            Add to Reminders
-                                        </button>
+                                        {(!pres.medications || pres.medications.length === 0) && (
+                                            <button 
+                                                onClick={() => handleAddFromPrescription(pres)}
+                                                className="text-sm bg-primary/10 text-primary px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors flex items-center gap-2 self-start"
+                                            >
+                                                <Plus size={16} />
+                                                Add to Reminders
+                                            </button>
+                                        )}
                                     </div>
                                     
-                                    <div className="space-y-3">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="bg-background p-3 rounded-lg">
-                                                <p className="text-xs text-muted-foreground mb-1">Medication</p>
-                                                <p className="font-medium">{pres.medicationDetails}</p>
-                                            </div>
-                                            <div className="bg-background p-3 rounded-lg">
-                                                <p className="text-xs text-muted-foreground mb-1">Dosage</p>
-                                                <p className="font-medium">{pres.dosage}</p>
-                                            </div>
-                                        </div>
-                                        
-                                        {(pres.duration || pres.timesPerDay) && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {pres.duration && (
-                                                    <div className="bg-background p-3 rounded-lg">
-                                                        <p className="text-xs text-muted-foreground mb-1">Duration</p>
-                                                        <p className="font-medium">{pres.duration}</p>
+                                    <div className="space-y-4">
+                                        {pres.medications && pres.medications.length > 0 ? (
+                                            pres.medications.map((med, idx) => (
+                                                <div key={idx} className="space-y-3 bg-muted/30 p-3 rounded-lg relative group">
+                                                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button 
+                                                            onClick={() => handleAddFromPrescription(pres, med)}
+                                                            className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 transition-colors flex items-center gap-1 shadow-sm"
+                                                        >
+                                                            <Plus size={14} /> Add
+                                                        </button>
                                                     </div>
-                                                )}
-                                                {pres.timesPerDay && (
-                                                    <div className="bg-background p-3 rounded-lg">
-                                                        <p className="text-xs text-muted-foreground mb-1">Times Per Day</p>
-                                                        <p className="font-medium">{pres.timesPerDay}x daily</p>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div className="bg-background p-3 rounded-lg pr-16">
+                                                            <p className="text-xs text-muted-foreground mb-1">Medication</p>
+                                                            <p className="font-medium">{med.name}</p>
+                                                        </div>
+                                                        <div className="bg-background p-3 rounded-lg">
+                                                            <p className="text-xs text-muted-foreground mb-1">Dosage</p>
+                                                            <p className="font-medium">{med.dosage}</p>
+                                                        </div>
                                                     </div>
-                                                )}
-                                            </div>
-                                        )}
+                                                    
+                                                    {(med.duration || med.timesPerDay || (med.reminderTimes && med.reminderTimes.length > 0)) && (
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                            {med.duration && (
+                                                                <div className="bg-background p-3 rounded-lg">
+                                                                    <p className="text-xs text-muted-foreground mb-1">Duration</p>
+                                                                    <p className="font-medium">{med.duration}</p>
+                                                                </div>
+                                                            )}
+                                                            {med.timesPerDay && (
+                                                                <div className="bg-background p-3 rounded-lg">
+                                                                    <p className="text-xs text-muted-foreground mb-1">Times Per Day</p>
+                                                                    <p className="font-medium">{med.timesPerDay}x daily</p>
+                                                                </div>
+                                                            )}
+                                                            {med.reminderTimes && med.reminderTimes.length > 0 && (
+                                                                <div className="bg-background p-3 rounded-lg">
+                                                                    <p className="text-xs text-muted-foreground mb-1">Schedule</p>
+                                                                    <p className="font-medium">{med.reminderTimes.join(', ')}</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
 
-                                        {pres.instructions && (
-                                            <div className="bg-background p-3 rounded-lg">
-                                                <p className="text-xs text-muted-foreground mb-1">Instructions / Tips</p>
-                                                <p className="text-sm">{pres.instructions}</p>
+                                                    {med.instructions && (
+                                                        <div className="bg-background p-3 rounded-lg">
+                                                            <p className="text-xs text-muted-foreground mb-1">Instructions / Tips</p>
+                                                            <p className="text-sm">{med.instructions}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="bg-background p-3 rounded-lg">
+                                                        <p className="text-xs text-muted-foreground mb-1">Medication</p>
+                                                        <p className="font-medium">{pres.medicationDetails}</p>
+                                                    </div>
+                                                    <div className="bg-background p-3 rounded-lg">
+                                                        <p className="text-xs text-muted-foreground mb-1">Dosage</p>
+                                                        <p className="font-medium">{pres.dosage}</p>
+                                                    </div>
+                                                </div>
+                                                
+                                                {(pres.duration || pres.timesPerDay) && (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        {pres.duration && (
+                                                            <div className="bg-background p-3 rounded-lg">
+                                                                <p className="text-xs text-muted-foreground mb-1">Duration</p>
+                                                                <p className="font-medium">{pres.duration}</p>
+                                                            </div>
+                                                        )}
+                                                        {pres.timesPerDay && (
+                                                            <div className="bg-background p-3 rounded-lg">
+                                                                <p className="text-xs text-muted-foreground mb-1">Times Per Day</p>
+                                                                <p className="font-medium">{pres.timesPerDay}x daily</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {pres.instructions && (
+                                                    <div className="bg-background p-3 rounded-lg">
+                                                        <p className="text-xs text-muted-foreground mb-1">Instructions / Tips</p>
+                                                        <p className="text-sm">{pres.instructions}</p>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>

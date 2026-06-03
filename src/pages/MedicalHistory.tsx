@@ -14,7 +14,8 @@ import {
   CheckCircle2, 
   AlertCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Search
 } from 'lucide-react';
 
 interface HistoryAnalysisResult {
@@ -62,6 +63,7 @@ const MedicalHistory = () => {
   const [analysisResult, setAnalysisResult] = useState<HistoryAnalysisResult | null>(null);
   const [appointments, setAppointments] = useState<ShareableAppointment[]>([]);
   const [sharingStatus, setSharingStatus] = useState<Record<string, string>>({});
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Medical records state
   const [medicalRecords, setMedicalRecords] = useState<MedicalRecordItem[]>([]);
@@ -245,15 +247,42 @@ ${analysisResult.summaryForDoctor || 'N/A'}
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="animate-fade-up">
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <Activity className="text-primary" size={32} />
-            Medical History
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Track your health background and share it with your doctors
-          </p>
-        </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+                <Activity className="text-primary" size={32} />
+                Medical History
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Track your health background and share it with your doctors
+              </p>
+            </div>
+            {user && (
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await authFetch(`/api/pdf/summary/${user.id}`);
+                    if (!res.ok) throw new Error('Download failed');
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `Health_Summary_${user.name?.replace(/\s+/g, '_') || 'Patient'}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                  } catch (err) {
+                    alert('Failed to download PDF summary');
+                  }
+                }}
+                className="btn-medical flex items-center gap-2 whitespace-nowrap"
+              >
+                <Download size={18} />
+                Download PDF Summary
+              </button>
+            )}
+          </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Left Column: Manual History */}
@@ -348,13 +377,27 @@ ${analysisResult.summaryForDoctor || 'N/A'}
 
         {/* Doctor's Medical Records Section */}
         <div className="card-medical animate-fade-up space-y-4" style={{ animationDelay: '250ms' }}>
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <FolderOpen className="text-violet-500" size={24} />
-            Doctor's Medical Records
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Medical records and documents uploaded by your doctors. AI automatically analyzes these and updates your health history.
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <FolderOpen className="text-violet-500" size={24} />
+                Doctor's Medical Records
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Medical records and documents uploaded by your doctors. AI automatically analyzes these and updates your health history.
+              </p>
+            </div>
+            <div className="relative w-full sm:w-64 shrink-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+              <input
+                type="text"
+                placeholder="Search records..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="input-medical pl-9 py-2 text-sm w-full"
+              />
+            </div>
+          </div>
 
           {isLoadingRecords ? (
             <div className="flex items-center justify-center py-10">
@@ -368,7 +411,7 @@ ${analysisResult.summaryForDoctor || 'N/A'}
             </div>
           ) : (
             <div className="space-y-3">
-              {medicalRecords.map((record) => (
+              {medicalRecords.filter(r => r.fileName.toLowerCase().includes(searchQuery.toLowerCase()) || r.status.toLowerCase().includes(searchQuery.toLowerCase())).map((record) => (
                 <div
                   key={record._id}
                   className="border border-border rounded-xl overflow-hidden transition-all duration-200 hover:border-violet-300 dark:hover:border-violet-500/40"

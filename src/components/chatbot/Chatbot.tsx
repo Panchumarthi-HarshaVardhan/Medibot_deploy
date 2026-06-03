@@ -96,6 +96,26 @@ export const Chatbot = () => {
   useEffect(() => {
     if (isVoiceListening && transcript) setInputValue(transcript);
   }, [isVoiceListening, transcript]);
+
+  // Continuous Voice Mode: Auto-send when listening stops and we have input
+  useEffect(() => {
+    if (voiceMode && !isVoiceListening && inputValue.trim() && !isTyping && !isSpeaking) {
+      const sendAction = async () => {
+        const textToSend = inputValue;
+        setInputValue('');
+        await handleSendText(textToSend);
+      };
+      sendAction();
+    }
+  }, [voiceMode, isVoiceListening, inputValue, isTyping, isSpeaking]);
+
+  // Continuous Voice Mode: Auto-restart listening after bot finishes speaking
+  useEffect(() => {
+    if (voiceMode && !isSpeaking && !isVoiceListening && !isTyping && !inputValue.trim()) {
+      startVoiceListening();
+    }
+  }, [voiceMode, isSpeaking, isVoiceListening, isTyping, inputValue, startVoiceListening]);
+
   const [context] = useState<{ age?: number; gender?: string; symptoms?: string[] }>({});
   const storageKey = useMemo(() => `health_chat_sessions_${user?.id || 'guest'}`, [user?.id]);
 
@@ -176,13 +196,13 @@ export const Chatbot = () => {
   };
 
   // Per-message read-aloud button
-  const handleSpeakMessage = async (text: string) => {
+  const handleSpeakMessage = async (text: string, options?: { languageCode?: string }) => {
     if (isSpeaking) cancelSpeech();
-    else await speak(text);
+    else await speak(text, options);
   };
 
-  const handleSend = async () => {
-    if (!inputValue.trim() || !activeSession) return;
+  const handleSendText = async (messageText: string) => {
+    if (!messageText.trim() || !activeSession) return;
 
     if (!user?.token) {
       const botMessage: ChatMessage = {
@@ -197,19 +217,23 @@ export const Chatbot = () => {
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
-      text: inputValue,
+      text: messageText,
       sender: 'user',
       timestamp: new Date()
     };
 
     const userMessageList = [...messages, userMessage];
     updateActiveSessionMessages(userMessageList);
-    const messageText = inputValue;
-    setInputValue('');
     setIsTyping(true);
 
     try {
-      const requestContext = { ...context, userId: user?.id || null, userRole: user?.role || null, userName: user?.name || null };
+      const requestContext = { 
+        ...context, 
+        userId: user?.id || null, 
+        userRole: user?.role || null, 
+        userName: user?.name || null,
+        userLanguage: user?.language || 'en'
+      };
       const response = await authFetch('/api/chatbot', {
         method: 'POST',
         body: JSON.stringify({ message: messageText, context: requestContext }),
@@ -245,7 +269,7 @@ export const Chatbot = () => {
       }
       
       // Auto-speak when voice mode is enabled OR last message was from voice input
-      if (voiceMode || lastMessageWasVoiceInput) await speak(botMessage.text);
+      if (voiceMode || lastMessageWasVoiceInput) await speak(botMessage.text, { languageCode: user?.language || 'en' });
       
       // Reset the flag
       setLastMessageWasVoiceInput(false);
@@ -261,6 +285,12 @@ export const Chatbot = () => {
     } finally {
       setIsTyping(false);
     }
+  };
+
+  const handleSend = () => {
+    const text = inputValue;
+    setInputValue('');
+    handleSendText(text);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -391,7 +421,7 @@ export const Chatbot = () => {
                       </p>
                       {message.sender === 'bot' && (
                         <button
-                          onClick={() => handleSpeakMessage(message.text)}
+                          onClick={() => handleSpeakMessage(message.text, { languageCode: user?.language || 'en' })}
                           className="text-muted-foreground hover:text-foreground"
                           title="Listen"
                         >
@@ -477,17 +507,41 @@ export const Chatbot = () => {
               </div>
               <div className="flex gap-2">
                 {voiceSupported.stt && (
-                  <button
-                    onClick={handleMicPress}
-                    disabled={isVoiceListening}
-                    className={cn(
-                      "p-3 rounded-lg border border-border transition-colors",
-                      isVoiceListening ? "bg-red-100 text-red-600 animate-pulse" : "bg-muted hover:bg-muted/80"
+                  <>
+                    <button
+                      onClick={() => {
+                        setVoiceMode(!voiceMode);
+                        if (!voiceMode) {
+                          startVoiceListening();
+                        } else {
+                          stopVoiceListening();
+                          cancelSpeech();
+                        }
+                      }}
+                      className={cn(
+                        "p-3 rounded-lg border transition-colors flex items-center justify-center min-w-[42px]",
+                        voiceMode 
+                          ? "bg-primary text-primary-foreground border-primary" 
+                          : "bg-muted border-border hover:bg-muted/80 text-muted-foreground"
+                      )}
+                      title={voiceMode ? "Disable Continuous Voice Mode" : "Enable Continuous Voice Mode"}
+                    >
+                      {voiceMode ? <Mic size={18} className="animate-pulse" /> : <MicOff size={18} />}
+                    </button>
+                    {!voiceMode && (
+                      <button
+                        onClick={handleMicPress}
+                        disabled={isVoiceListening}
+                        className={cn(
+                          "p-3 rounded-lg border border-border transition-colors",
+                          isVoiceListening ? "bg-red-100 text-red-600 animate-pulse" : "bg-muted hover:bg-muted/80"
+                        )}
+                        title="Hold to speak (Push-to-talk)"
+                      >
+                        <Mic size={18} />
+                      </button>
                     )}
-                    title="Voice Input"
-                  >
-                    {isVoiceListening ? <MicOff size={18} /> : <Mic size={18} />}
-                  </button>
+                  </>
                 )}
                 <input
                   type="text"

@@ -28,7 +28,7 @@ export interface UseVoiceReturn {
   transcript: string;
   startListening: () => void;
   stopListening: () => string;
-  speak: (text: string, voiceName?: string) => Promise<void>;
+  speak: (text: string, options?: { languageCode?: string; voiceName?: string }) => Promise<void>;
   cancelSpeech: () => void;
   isSupported: { stt: boolean; tts: boolean };
   error: string | null;
@@ -153,7 +153,7 @@ export const useVoice = (): UseVoiceReturn => {
   }, [transcript]);
 
   // ── speak — Google Cloud TTS with browser fallback ───────────────────────
-  const speak = useCallback(async (text: string, voiceName?: string) => {
+  const speak = useCallback(async (text: string, options?: { languageCode?: string; voiceName?: string }) => {
     if (!text?.trim()) return;
 
     if (audioRef.current) {
@@ -174,7 +174,7 @@ export const useVoice = (): UseVoiceReturn => {
     const playGoogleAudio = async (): Promise<void> => {
       const response = await authFetch('/api/voice/speak', {
         method: 'POST',
-        body: JSON.stringify({ text: cleanText, voiceName }),
+        body: JSON.stringify({ text: cleanText, voiceName: options?.voiceName, languageCode: options?.languageCode }),
       });
 
       if (!response.ok) {

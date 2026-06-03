@@ -228,6 +228,9 @@ Return JSON only:
       }
 
       const isDoctor = context.userRole === 'doctor';
+      const userLang = context.userLanguage || 'en';
+      const langInstruction = userLang === 'hi' ? 'Respond in Hindi.' : userLang === 'te' ? 'Respond in Telugu.' : 'Respond in English.';
+      
       const systemPrompt = `You are MediBot, a helpful health assistant talking to a ${isDoctor ? 'Doctor' : 'Patient'}.
 Your role is to:
 ${isDoctor ? `
@@ -238,7 +241,7 @@ ${isDoctor ? `
 2. Help the patient book appointments or set medication reminders.
 3. Advise seeking emergency services for life-threatening symptoms.
 4. Keep responses friendly, concise, and empathetic.`}
-Important: If the user only says hi/hello/hey, reply briefly (one sentence) about what you can help with—do NOT repeat a full introduction if you already greeted them earlier in this chat.`;
+Important: ${langInstruction} If the user only says hi/hello/hey, reply briefly (one sentence) about what you can help with—do NOT repeat a full introduction if you already greeted them earlier in this chat.`;
 
       let text = '';
       if (isGroqConfigured()) {
