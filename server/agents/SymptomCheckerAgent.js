@@ -66,6 +66,8 @@ Respond in the following JSON format only:
   "severity": "mild" | "moderate" | "severe",
   "advice": "Self-care advice",
   "recommendation": "Recommendation (e.g., Monitor symptoms, Consult a doctor, Seek emergency care)",
+  "specialistType": "The type of specialist doctor to consult (e.g., General Physician, Cardiologist, Pulmonologist, Dermatologist, Neurologist, Gastroenterologist, Orthopedist, ENT Specialist, Ophthalmologist, Psychiatrist, Endocrinologist, Urologist, Gynecologist, Allergist, Rheumatologist)",
+  "specialistReason": "Brief 1-2 sentence explanation of why this specialist is recommended based on the symptoms",
   "confidence": 0-100
 }
 
@@ -73,6 +75,8 @@ Important notes:
 - For severe symptoms (chest pain, difficulty breathing, severe bleeding, etc.), mark severity as "severe"
 - Always advise seeking emergency care for life-threatening symptoms
 - Keep advice concise and actionable
+- Choose the most appropriate specialist based on the primary symptoms
+- For general/mild symptoms, recommend "General Physician"
 - Remember this is general guidance, not a diagnosis
 - End all responses with a note to consult a healthcare professional for proper diagnosis`;
 
@@ -81,12 +85,11 @@ Important notes:
       const text = await generateText(prompt, { temperature: 0.2 });
       const analysisResult = parseJsonFromText(text);
 
-      // FIX: removed redundant sendMessage back-call to ChatbotAgent
-      // ChatbotAgent already awaits the return value of sendMessage('SymptomCheckerAgent', ...)
-
       return {
         type: 'symptom_analysis',
         ...analysisResult,
+        specialistType: analysisResult.specialistType || 'General Physician',
+        specialistReason: analysisResult.specialistReason || 'A general physician can evaluate your symptoms and refer you to a specialist if needed.',
         agent: this.name,
         disclaimer: '⚠️ This is general guidance only. Always consult a healthcare professional for medical advice.'
       };
@@ -118,12 +121,41 @@ Important notes:
     const hasSevere = symptoms.some((s) => severeKeywords.some((k) => s.includes(k)));
     const hasModerate = symptoms.some((s) => moderateKeywords.some((k) => s.includes(k)));
 
+    // Specialist mapping for fallback
+    const specialistMap = [
+      { keywords: ['chest pain', 'heart', 'palpitations', 'blood pressure'], specialist: 'Cardiologist', reason: 'Your symptoms may be related to cardiovascular health and should be evaluated by a heart specialist.' },
+      { keywords: ['breathing', 'cough', 'asthma', 'wheezing', 'lung'], specialist: 'Pulmonologist', reason: 'Your respiratory symptoms should be evaluated by a lung specialist.' },
+      { keywords: ['skin', 'rash', 'acne', 'itching', 'hives', 'eczema'], specialist: 'Dermatologist', reason: 'Your skin-related symptoms are best evaluated by a dermatology specialist.' },
+      { keywords: ['headache', 'migraine', 'numbness', 'tingling', 'seizure', 'memory'], specialist: 'Neurologist', reason: 'Your neurological symptoms should be assessed by a brain and nerve specialist.' },
+      { keywords: ['stomach', 'abdominal', 'diarrhea', 'constipation', 'bloating', 'acid reflux', 'nausea', 'vomiting'], specialist: 'Gastroenterologist', reason: 'Your digestive symptoms should be evaluated by a gastrointestinal specialist.' },
+      { keywords: ['joint', 'back pain', 'bone', 'muscle pain', 'fracture', 'sprain'], specialist: 'Orthopedist', reason: 'Your musculoskeletal symptoms should be examined by a bone and joint specialist.' },
+      { keywords: ['ear', 'throat', 'sore throat', 'sinus', 'nose', 'hearing', 'tonsil'], specialist: 'ENT Specialist', reason: 'Your ear, nose, or throat symptoms are best evaluated by an ENT specialist.' },
+      { keywords: ['eye', 'vision', 'blurry', 'eye pain'], specialist: 'Ophthalmologist', reason: 'Your eye-related symptoms should be examined by an eye specialist.' },
+      { keywords: ['anxiety', 'depression', 'stress', 'insomnia', 'panic', 'mood'], specialist: 'Psychiatrist', reason: 'Your mental health symptoms should be discussed with a mental health specialist.' },
+      { keywords: ['diabetes', 'thyroid', 'hormone', 'weight gain', 'fatigue'], specialist: 'Endocrinologist', reason: 'Your symptoms may be related to hormonal or metabolic conditions that an endocrinologist can evaluate.' },
+      { keywords: ['urinary', 'kidney', 'bladder', 'urine'], specialist: 'Urologist', reason: 'Your urinary symptoms should be evaluated by a urological specialist.' },
+      { keywords: ['allergy', 'allergic', 'sneezing', 'runny nose', 'hay fever'], specialist: 'Allergist', reason: 'Your allergy symptoms should be evaluated by an allergy and immunology specialist.' },
+    ];
+
+    let specialist = 'General Physician';
+    let specialistReason = 'A general physician can evaluate your symptoms comprehensively and refer you to a specialist if needed.';
+
+    for (const mapping of specialistMap) {
+      if (symptoms.some((s) => mapping.keywords.some((k) => s.includes(k)))) {
+        specialist = mapping.specialist;
+        specialistReason = mapping.reason;
+        break;
+      }
+    }
+
     if (hasSevere) {
       return {
         condition: 'Possible urgent medical condition',
         severity: 'severe',
         advice: 'Do not delay care. Stay with someone and avoid self-medicating for severe symptoms.',
-        recommendation: 'Seek emergency medical care immediately.'
+        recommendation: 'Seek emergency medical care immediately.',
+        specialistType: specialist,
+        specialistReason: specialistReason
       };
     }
 
@@ -132,7 +164,9 @@ Important notes:
         condition: 'Likely moderate viral or inflammatory condition',
         severity: 'moderate',
         advice: 'Hydrate well, rest, and monitor symptoms every few hours.',
-        recommendation: 'Consult a doctor soon, especially if symptoms worsen in 24 hours.'
+        recommendation: 'Consult a doctor soon, especially if symptoms worsen in 24 hours.',
+        specialistType: specialist,
+        specialistReason: specialistReason
       };
     }
 
@@ -140,7 +174,9 @@ Important notes:
       condition: 'Likely mild condition',
       severity: 'mild',
       advice: 'Rest, hydrate, and monitor your symptoms.',
-      recommendation: 'Continue self-care and consult a doctor if symptoms persist.'
+      recommendation: 'Continue self-care and consult a doctor if symptoms persist.',
+      specialistType: specialist,
+      specialistReason: specialistReason
     };
   }
 }

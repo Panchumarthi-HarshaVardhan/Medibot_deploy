@@ -70,6 +70,8 @@ export interface SymptomResult {
   advice: string;
   severity: 'mild' | 'moderate' | 'severe';
   recommendation: string;
+  specialistType?: string;
+  specialistReason?: string;
 }
 
 export interface HealthTip {

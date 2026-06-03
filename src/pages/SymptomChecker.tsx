@@ -12,7 +12,8 @@ import {
   AlertCircle,
   CheckCircle,
   Calendar,
-  RefreshCw
+  RefreshCw,
+  UserCheck
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -63,7 +64,9 @@ const SymptomChecker = () => {
               ? data.severity
               : 'moderate') as SymptomResult['severity'],
             advice: data.advice,
-            recommendation: data.recommendation
+            recommendation: data.recommendation,
+            specialistType: data.specialistType || 'General Physician',
+            specialistReason: data.specialistReason || 'A general physician can evaluate your symptoms and refer you to a specialist if needed.'
           });
 
           // Save history to backend
@@ -298,7 +301,30 @@ const SymptomChecker = () => {
                   <p className="text-primary text-sm font-medium">{result.recommendation}</p>
                 </div>
 
-                {result.severity !== 'mild' && (
+                {/* Specialist Doctor Recommendation */}
+                {result.specialistType && (
+                  <div className="p-4 rounded-xl border-2 border-info/30 bg-gradient-to-br from-info/5 to-info/10">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2.5 rounded-xl bg-info/15 text-info shrink-0 mt-0.5">
+                        <UserCheck size={22} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-foreground text-base">Recommended Specialist</h3>
+                        <p className="text-info font-bold text-lg mt-1">{result.specialistType}</p>
+                        <p className="text-muted-foreground text-sm mt-1.5 leading-relaxed">{result.specialistReason}</p>
+                      </div>
+                    </div>
+                    <Link
+                      to={`/appointments?specialization=${encodeURIComponent(result.specialistType)}`}
+                      className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-info text-info-foreground font-medium text-sm hover:bg-info/90 transition-colors"
+                    >
+                      <Calendar size={16} />
+                      Book with {result.specialistType}
+                    </Link>
+                  </div>
+                )}
+
+                {result.severity !== 'mild' && !result.specialistType && (
                   <Link
                     to="/appointments"
                     className="btn-medical w-full flex items-center justify-center gap-2"
@@ -318,9 +344,9 @@ const SymptomChecker = () => {
                 onClick={handleBack}
                 className="flex items-center gap-2 px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
               >
-                <ArrowLeft size={18} />
-                Back
-              </button>
+              <ArrowLeft size={18} />
+              Back
+            </button>
             ) : currentStep === 'result' ? (
               <button
                 onClick={handleReset}

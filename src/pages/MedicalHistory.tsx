@@ -2,7 +2,20 @@ import { authFetch } from '@/utils/api';
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useAuthContext } from '@/context/AuthContext';
-import { Activity, FileText, Send, Loader2, Save } from 'lucide-react';
+import { 
+  Activity, 
+  FileText, 
+  Send, 
+  Loader2, 
+  Save, 
+  FolderOpen, 
+  Download, 
+  Clock, 
+  CheckCircle2, 
+  AlertCircle,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
 
 interface HistoryAnalysisResult {
   overallHealthStatus: string;
@@ -21,6 +34,26 @@ interface ShareableAppointment {
   time?: string;
 }
 
+interface MedicalRecordAIAnalysis {
+  summary?: string;
+  conditions?: string[];
+  medications?: string[];
+  labResults?: string[];
+  keyFindings?: string[];
+  recommendations?: string[];
+}
+
+interface MedicalRecordItem {
+  _id: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  status: 'pending' | 'analyzed' | 'error';
+  aiAnalysis?: MedicalRecordAIAnalysis;
+  uploaded_by?: { name: string; specialization?: string };
+  createdAt: string;
+}
+
 const MedicalHistory = () => {
   const { user } = useAuthContext();
   const [medicalHistory, setMedicalHistory] = useState(user?.medicalHistory || '');
@@ -29,6 +62,12 @@ const MedicalHistory = () => {
   const [analysisResult, setAnalysisResult] = useState<HistoryAnalysisResult | null>(null);
   const [appointments, setAppointments] = useState<ShareableAppointment[]>([]);
   const [sharingStatus, setSharingStatus] = useState<Record<string, string>>({});
+
+  // Medical records state
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecordItem[]>([]);
+  const [isLoadingRecords, setIsLoadingRecords] = useState(false);
+  const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     // Fetch upcoming appointments where we can share history
@@ -43,6 +82,20 @@ const MedicalHistory = () => {
           setAppointments(shareable);
         })
         .catch(console.error);
+    }
+  }, [user?.id]);
+
+  // Fetch medical records
+  useEffect(() => {
+    if (user?.id) {
+      setIsLoadingRecords(true);
+      authFetch(`/api/medical-records/${user.id}`)
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          setMedicalRecords(Array.isArray(data) ? data : []);
+        })
+        .catch(console.error)
+        .finally(() => setIsLoadingRecords(false));
     }
   }, [user?.id]);
 
@@ -124,6 +177,69 @@ ${analysisResult.summaryForDoctor || 'N/A'}
       setSharingStatus(prev => ({ ...prev, [appointmentId]: 'error' }));
       alert('Error sharing history.');
     }
+  };
+
+  const handleDownloadRecord = async (recordId: string, fileName: string) => {
+    setDownloadingId(recordId);
+    try {
+      const res = await authFetch(`/api/medical-records/file/${recordId}`);
+      if (!res.ok) throw new Error('Download failed');
+      const data = await res.json();
+      
+      // Create a download link from Base64
+      const link = document.createElement('a');
+      link.href = `data:${data.fileType};base64,${data.fileData}`;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      alert('Error downloading file.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'analyzed':
+        return (
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400">
+            <CheckCircle2 size={12} />
+            Analyzed
+          </span>
+        );
+      case 'pending':
+        return (
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+            <Clock size={12} />
+            Processing
+          </span>
+        );
+      case 'error':
+        return (
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400">
+            <AlertCircle size={12} />
+            Error
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getFileIcon = (type: string) => {
+    if (type === 'application/pdf') return '📄';
+    if (type.startsWith('image/')) return '🖼️';
+    if (type === 'text/plain') return '📝';
+    if (type === 'text/csv') return '📊';
+    return '📁';
   };
 
   return (
@@ -230,6 +346,189 @@ ${analysisResult.summaryForDoctor || 'N/A'}
           </div>
         </div>
 
+        {/* Doctor's Medical Records Section */}
+        <div className="card-medical animate-fade-up space-y-4" style={{ animationDelay: '250ms' }}>
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <FolderOpen className="text-violet-500" size={24} />
+            Doctor's Medical Records
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Medical records and documents uploaded by your doctors. AI automatically analyzes these and updates your health history.
+          </p>
+
+          {isLoadingRecords ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="animate-spin text-muted-foreground" size={28} />
+            </div>
+          ) : medicalRecords.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground bg-muted/30 rounded-xl">
+              <FolderOpen size={40} className="mx-auto mb-3 opacity-30" />
+              <p className="text-sm">No medical records uploaded by doctors yet.</p>
+              <p className="text-xs mt-1">Records will appear here when your doctor uploads them.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {medicalRecords.map((record) => (
+                <div
+                  key={record._id}
+                  className="border border-border rounded-xl overflow-hidden transition-all duration-200 hover:border-violet-300 dark:hover:border-violet-500/40"
+                >
+                  {/* Record Header */}
+                  <div
+                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                    onClick={() => setExpandedRecord(expandedRecord === record._id ? null : record._id)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-2xl">{getFileIcon(record.fileType)}</span>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{record.fileName}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                          <span>{formatFileSize(record.fileSize)}</span>
+                          <span>•</span>
+                          <span>{new Date(record.createdAt).toLocaleDateString()}</span>
+                          {record.uploaded_by && (
+                            <>
+                              <span>•</span>
+                              <span>Dr. {record.uploaded_by.name}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {getStatusBadge(record.status)}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDownloadRecord(record._id, record.fileName); }}
+                        disabled={downloadingId === record._id}
+                        className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                        title="Download"
+                      >
+                        {downloadingId === record._id ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Download size={16} />
+                        )}
+                      </button>
+                      {expandedRecord === record._id ? (
+                        <ChevronUp size={18} className="text-muted-foreground" />
+                      ) : (
+                        <ChevronDown size={18} className="text-muted-foreground" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expanded AI Analysis */}
+                  {expandedRecord === record._id && record.status === 'analyzed' && record.aiAnalysis && (
+                    <div className="px-4 pb-4 border-t border-border bg-muted/20">
+                      <div className="pt-4 space-y-3">
+                        {/* Summary */}
+                        {record.aiAnalysis.summary && (
+                          <div className="p-3 bg-violet-50 dark:bg-violet-500/10 rounded-lg border border-violet-200 dark:border-violet-500/20">
+                            <h4 className="text-xs font-semibold text-violet-700 dark:text-violet-400 uppercase tracking-wider mb-1">Summary</h4>
+                            <p className="text-sm text-foreground">{record.aiAnalysis.summary}</p>
+                          </div>
+                        )}
+
+                        {/* Conditions */}
+                        {record.aiAnalysis.conditions && record.aiAnalysis.conditions.length > 0 && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-foreground/70 uppercase tracking-wider mb-1.5">Conditions Found</h4>
+                            <div className="flex flex-wrap gap-1.5">
+                              {record.aiAnalysis.conditions.map((c, i) => (
+                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400 font-medium">
+                                  {c}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Medications */}
+                        {record.aiAnalysis.medications && record.aiAnalysis.medications.length > 0 && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-foreground/70 uppercase tracking-wider mb-1.5">Medications</h4>
+                            <div className="flex flex-wrap gap-1.5">
+                              {record.aiAnalysis.medications.map((m, i) => (
+                                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400 font-medium">
+                                  {m}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Lab Results */}
+                        {record.aiAnalysis.labResults && record.aiAnalysis.labResults.length > 0 && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-foreground/70 uppercase tracking-wider mb-1.5">Lab Results</h4>
+                            <ul className="text-sm space-y-1 text-muted-foreground">
+                              {record.aiAnalysis.labResults.map((l, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-primary mt-1">•</span>
+                                  <span>{l}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Key Findings */}
+                        {record.aiAnalysis.keyFindings && record.aiAnalysis.keyFindings.length > 0 && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-foreground/70 uppercase tracking-wider mb-1.5">Key Findings</h4>
+                            <ul className="text-sm space-y-1 text-muted-foreground">
+                              {record.aiAnalysis.keyFindings.map((f, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-amber-500 mt-1">•</span>
+                                  <span>{f}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Recommendations */}
+                        {record.aiAnalysis.recommendations && record.aiAnalysis.recommendations.length > 0 && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-foreground/70 uppercase tracking-wider mb-1.5">Recommendations</h4>
+                            <ul className="text-sm space-y-1 text-muted-foreground">
+                              {record.aiAnalysis.recommendations.map((r, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-green-500 mt-1">•</span>
+                                  <span>{r}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pending/Error state in expanded view */}
+                  {expandedRecord === record._id && record.status === 'pending' && (
+                    <div className="px-4 pb-4 border-t border-border">
+                      <div className="flex items-center gap-3 py-4 text-muted-foreground">
+                        <Loader2 size={18} className="animate-spin" />
+                        <p className="text-sm">AI analysis is in progress. Please check back shortly.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {expandedRecord === record._id && record.status === 'error' && (
+                    <div className="px-4 pb-4 border-t border-border">
+                      <div className="flex items-center gap-3 py-4 text-red-500">
+                        <AlertCircle size={18} />
+                        <p className="text-sm">AI analysis encountered an error. The file has been stored for manual review.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Share History Section */}
         <div className="card-medical animate-fade-up space-y-4" style={{ animationDelay: '300ms' }}>
           <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -251,7 +550,7 @@ ${analysisResult.summaryForDoctor || 'N/A'}
                   <div>
                     <h3 className="font-medium text-foreground">Dr. {apt.doctor_name}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(apt.date).toLocaleDateString()} at {apt.time}
+                      {new Date(apt.date!).toLocaleDateString()} at {apt.time}
                     </p>
                   </div>
                   <button

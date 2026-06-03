@@ -1,8 +1,9 @@
 import User from '../models/User.js';
 import SymptomCheck from '../models/SymptomCheck.js';
 import Prescription from '../models/Prescription.js';
+import MedicalRecord from '../models/MedicalRecord.js';
 
-/** Load patient profile + recent checks + prescriptions for history analysis agents. */
+/** Load patient profile + recent checks + prescriptions + medical records for history analysis agents. */
 export async function loadPatientHistoryData(userId) {
   if (!userId) {
     throw new Error('User ID is required to load medical history');
@@ -17,6 +18,10 @@ export async function loadPatientHistoryData(userId) {
     .sort({ createdAt: -1 })
     .limit(5);
   const prescriptions = await Prescription.find({ patient_id: userId }).sort({ createdAt: -1 });
+  const medicalRecords = await MedicalRecord.find({ patient_id: userId, status: 'analyzed' })
+    .select('-fileData')
+    .sort({ createdAt: -1 })
+    .limit(10);
 
   return {
     userId: user._id.toString(),
@@ -26,6 +31,7 @@ export async function loadPatientHistoryData(userId) {
     medicalHistory: user.medicalHistory,
     symptomChecks: symptomChecks.map((c) => c.toObject()),
     prescriptions: prescriptions.map((p) => p.toObject()),
+    medicalRecords: medicalRecords.map((r) => r.toObject()),
   };
 }
 

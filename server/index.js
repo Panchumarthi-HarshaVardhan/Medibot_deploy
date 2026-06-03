@@ -15,7 +15,8 @@ import Appointment from './models/Appointment.js';
 import Prescription from './models/Prescription.js';
 import MedicationReminder from './models/MedicationReminder.js';
 import SymptomCheck from './models/SymptomCheck.js';
-import { chatbotAgent, symptomCheckerAgent, medicationReminderAgent, medicalHistoryAnalyzerAgent } from './agents/index.js';
+import MedicalRecord from './models/MedicalRecord.js';
+import { chatbotAgent, symptomCheckerAgent, medicationReminderAgent, medicalHistoryAnalyzerAgent, medicalRecordAnalyzerAgent } from './agents/index.js';
 import { sendOtpEmail, sendMedicationReminderEmail } from './utils/email.js';
 import voiceRouter from './routes/voice.js';
 import path from 'path';
@@ -705,6 +706,204 @@ app.post('/api/symptom-checker', requireAuth, aiLimiter, async (req, res) => {
   } catch (err) {
     console.error('Symptom checker error:', err);
     res.status(500).json({ error: 'Symptom checker error' });
+  }
+});
+
+// ── Medical Records Endpoints ─────────────────────────────────────────────────
+
+// Upload medical records (doctor only)
+app.post('/api/medical-records/upload', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({ error: 'Only doctors can upload medical records' });
+    }
+    const { patient_id, files } = req.body;
+    if (!patient_id || !files || !Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ error: 'Patient ID and at least one file are required' });
+    }
+    if (files.length > 5) {
+      return res.status(400).json({ error: 'Maximum 5 files per upload' });
+    }
+
+    const patient = await User.findById(patient_id);
+    if (!patient) return res.status(404).json({ error: 'Patient not found' });
+
+    const savedRecords = [];
+
+    for (const file of files) {
+      if (!file.name || !file.type || !file.data) {
+        continue; // Skip invalid files
+      }
+
+      // Check file size (Base64 is ~33% larger than binary; limit to ~5MB original)
+      const estimatedSize = Math.round((file.data.length * 3) / 4);
+      if (estimatedSize > 5 * 1024 * 1024) {
+        continue; // Skip files over 5MB
+      }
+
+      const record = new MedicalRecord({
+        patient_id,
+        uploaded_by: req.user.id,
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: estimatedSize,
+        fileData: file.data,
+        status: 'pending'
+      });
+      await record.save();
+      savedRecords.push(record);
+
+      // Trigger AI analysis asynchronously
+      (async () => {
+        try {
+          const result = await medicalRecordAnalyzerAgent.execute({
+            fileData: file.data,
+            fileType: file.type,
+            fileName: file.name,
+            patientName: patient.name,
+            patientAge: patient.age,
+            patientGender: patient.gender
+          });
+
+          record.aiAnalysis = result.analysis;
+          record.status = 'analyzed';
+          await record.save();
+
+          // Auto-merge key findings into patient's medical history
+          const newFindings = [];
+          if (result.analysis.conditions?.length) {
+            newFindings.push('Conditions: ' + result.analysis.conditions.join(', '));
+          }
+          if (result.analysis.medications?.length) {
+            newFindings.push('Medications: ' + result.analysis.medications.join(', '));
+          }
+          if (result.analysis.keyFindings?.length) {
+            newFindings.push('Key Findings: ' + result.analysis.keyFindings.join(', '));
+          }
+
+          if (newFindings.length > 0) {
+            const dateStr = new Date().toLocaleDateString();
+            const updateBlock = `\n\n--- Auto-updated from uploaded record "${file.name}" (${dateStr}) ---\n${newFindings.join('\n')}`;
+            const currentHistory = patient.medicalHistory || '';
+            patient.medicalHistory = currentHistory + updateBlock;
+            await patient.save();
+            console.log(`[MedicalRecords] Auto-updated history for patient ${patient_id}`);
+          }
+        } catch (analysisErr) {
+          console.error('[MedicalRecords] AI analysis failed:', analysisErr.message);
+          record.status = 'error';
+          await record.save();
+        }
+      })();
+    }
+
+    if (savedRecords.length === 0) {
+      return res.status(400).json({ error: 'No valid files were uploaded' });
+    }
+
+    res.status(201).json({
+      message: `${savedRecords.length} record(s) uploaded successfully. AI analysis in progress.`,
+      records: savedRecords.map(r => ({ _id: r._id, fileName: r.fileName, status: r.status }))
+    });
+  } catch (err) {
+    console.error('Error uploading medical records:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Get medical records for a patient
+app.get('/api/medical-records/:patientId', requireAuth, async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    // Patients can see their own records; doctors can see any patient's records
+    if (req.user.role === 'patient' && req.user.id !== patientId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    const records = await MedicalRecord.find({ patient_id: patientId })
+      .select('-fileData')
+      .populate('uploaded_by', 'name specialization')
+      .sort({ createdAt: -1 });
+    res.json(records);
+  } catch (err) {
+    console.error('Error fetching medical records:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Download/view a specific medical record file
+app.get('/api/medical-records/file/:id', requireAuth, async (req, res) => {
+  try {
+    const record = await MedicalRecord.findById(req.params.id);
+    if (!record) return res.status(404).json({ error: 'Record not found' });
+    // Access control: patient owns record or user is a doctor
+    if (req.user.role === 'patient' && req.user.id !== record.patient_id.toString()) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    res.json({
+      fileName: record.fileName,
+      fileType: record.fileType,
+      fileData: record.fileData
+    });
+  } catch (err) {
+    console.error('Error downloading medical record:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+// ── Patient History for Doctors ───────────────────────────────────────────────
+
+// Get full patient history for a doctor's view (past appointments, prescriptions, medical records)
+app.get('/api/patient-history/:patientId/doctor-view', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({ error: 'Only doctors can view patient history' });
+    }
+    const { patientId } = req.params;
+
+    // Get patient basic info
+    const patient = await User.findById(patientId, 'name age gender medicalHistory');
+    if (!patient) return res.status(404).json({ error: 'Patient not found' });
+
+    // Past appointments with THIS doctor
+    const pastAppointments = await Appointment.find({
+      patient_id: patientId,
+      doctor_id: req.user.id,
+      status: { $in: ['completed', 'accepted', 'confirmed'] }
+    }).sort({ date: -1, time: -1 }).limit(20);
+
+    // Prescriptions given by THIS doctor to this patient
+    const prescriptions = await Prescription.find({
+      patient_id: patientId,
+      doctor_id: req.user.id
+    }).sort({ createdAt: -1 }).limit(20);
+
+    // All medical records for this patient (uploaded by any doctor)
+    const medicalRecords = await MedicalRecord.find({ patient_id: patientId })
+      .select('-fileData')
+      .populate('uploaded_by', 'name specialization')
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    // Symptom checks for this patient
+    const symptomChecks = await SymptomCheck.find({ patient_id: patientId })
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    res.json({
+      patient: {
+        name: patient.name,
+        age: patient.age,
+        gender: patient.gender,
+        medicalHistory: patient.medicalHistory
+      },
+      pastAppointments: pastAppointments.map(a => a.toObject()),
+      prescriptions: prescriptions.map(p => p.toObject()),
+      medicalRecords: medicalRecords.map(r => r.toObject()),
+      symptomChecks: symptomChecks.map(s => s.toObject()),
+      hasHistory: pastAppointments.length > 0 || prescriptions.length > 0 || medicalRecords.length > 0
+    });
+  } catch (err) {
+    console.error('Error fetching patient history for doctor:', err);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
